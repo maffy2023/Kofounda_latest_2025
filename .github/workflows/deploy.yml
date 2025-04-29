@@ -63,12 +63,27 @@ jobs:
             kofounda.azurecr.io/kofounda:latest
             kofounda.azurecr.io/kofounda:${{ github.sha }}
 
-      - name: Deploy to VM Scale Set
+      - name: Deploy to VM
         uses: azure/CLI@v1
         with:
           inlineScript: |
-            az vmss run-command invoke \
-              --resource-group your-resource-group \
-              --name your-vmss-name \
-              --command-id RunShellScript \
-              --scripts "docker pull kofounda.azurecr.io/kofounda:latest && docker run -d -p 80:3000 kofounda.azurecr.io/kofounda:latest" 
+            # Get the first VM instance from the resource group
+            VM_NAME=$(az vm list -g zeustek_general_resource_group --query "[0].name" -o tsv)
+            
+            if [ -z "$VM_NAME" ]; then
+              echo "No VM instances found in the resource group. Trying to deploy directly to a specific VM."
+              # Deploy to a specific VM if known
+              az vm run-command invoke \
+                --resource-group zeustek_general_resource_group \
+                --name Kofounda \
+                --command-id RunShellScript \
+                --scripts "docker pull kofounda.azurecr.io/kofounda:latest && docker run -d --name kofounda-app --restart always -p 80:3000 kofounda.azurecr.io/kofounda:latest"
+            else
+              echo "Found VM instance: $VM_NAME. Deploying to this VM."
+              # Deploy to the found VM
+              az vm run-command invoke \
+                --resource-group zeustek_general_resource_group \
+                --name $VM_NAME \
+                --command-id RunShellScript \
+                --scripts "docker pull kofounda.azurecr.io/kofounda:latest && docker run -d --name kofounda-app --restart always -p 80:3000 kofounda.azurecr.io/kofounda:latest"
+            fi 
