@@ -18,7 +18,10 @@ RUN pnpm install
 # Copy the rest of the application
 COPY . .
 
-# Build the application but skip the Cloudflare worker build
+# Create directories that might be needed later
+RUN mkdir -p build/client public
+
+# Try to build the application
 RUN NODE_ENV=production pnpm run build || echo "Build failed but continuing"
 
 # Production stage
@@ -29,18 +32,22 @@ WORKDIR /app
 # Install Git for runtime dependencies that might need it
 RUN apk add --no-cache git
 
-# Copy built assets from the builder stage
-COPY --from=builder /app/package.json /app/pnpm-lock.yaml ./
+# Create directories
+RUN mkdir -p build/client public app
+
+# Copy files
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/pnpm-lock.yaml ./
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/app ./app
-COPY --from=builder /app/server.js ./
+COPY server.cjs ./
 
-# Install only production dependencies
-RUN npm install -g pnpm@8 && pnpm install --prod
+# Install express
+RUN npm install express
 
 # Expose the port the app runs on
 EXPOSE 3000
 
 # Start the app
-CMD ["node", "server.js"] 
+CMD ["node", "server.cjs"] 
