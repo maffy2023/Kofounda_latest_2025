@@ -24,27 +24,21 @@ RUN mkdir -p build/client public
 # Try to build the application
 RUN NODE_ENV=production pnpm run build || echo "Build failed but continuing"
 
-# Production stage
+# Create a minimal static file directory structure
+RUN mkdir -p /app/static
+
+# Production stage - use a clean Node image
 FROM node:18-alpine AS production
 
 WORKDIR /app
 
-# Install Git for runtime dependencies that might need it
-RUN apk add --no-cache git
-
-# Create directories
-RUN mkdir -p build/client public app
-
-# Copy files
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/pnpm-lock.yaml ./
-COPY --from=builder /app/build ./build
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/app ./app
+# Copy server file and static assets
 COPY server.cjs ./
+COPY --from=builder /app/build /app/build
+COPY --from=builder /app/public /app/public
 
-# Install express
-RUN npm install express
+# Install express with legacy peer deps to avoid conflicts
+RUN npm install express --legacy-peer-deps
 
 # Expose the port the app runs on
 EXPOSE 3000
